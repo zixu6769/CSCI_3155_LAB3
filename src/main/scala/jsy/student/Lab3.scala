@@ -11,7 +11,7 @@ object Lab3 extends JsyApplication with Lab3Like {
    * <Zijun Xu>
    * 
    * Partner: <Your Partner's Name>
-   * Collaborators: <Jianyi Chen>
+   * Collaborators: <>
    */
 
   /*
@@ -98,14 +98,17 @@ object Lab3 extends JsyApplication with Lab3Like {
           case Gt => s1 > s2
           case Ge => s1 >= s2
         }
-      case _ =>
-        val (n1, n2) = (toNumber(v1), toNumber(v2))
+      case (N(n1), N(n2)) =>
+        // val (n1, n2) = (toNumber(v1), toNumber(v2))
         (bop: @unchecked) match {
           case Lt => n1 < n2
           case Le => n1 <= n2
           case Gt => n1 > n2
           case Ge => n1 >= n2
         }
+      case _ => {
+        throw DynamicTypeError(v2)
+      }
     }
   }
 
@@ -221,16 +224,25 @@ object Lab3 extends JsyApplication with Lab3Like {
       val v:Expr = eval(env,e1)
       eval(extend(env,x,v),e2)
     }
+    case Call(e1, e2) => {
+      val v1 = eval(env, e1)
+      val v2 = eval(env, e2)
+      v1 match {
+        case Function(None, x, body) => eval(extend(env, x, eval(env, e2)), body)
+
+        case Function(Some(p), x, body) => {
+          // call eval on p as Function class?
+          val envNew = extend(env, x, eval(env,e2))
+          eval(extend(envNew, p, Function(Some(p), x, body)), body)
+        }
+
+        case _ => throw DynamicTypeError(e1)
+      }
+    }
     case _ => throw new UnsupportedOperationException
       // ****** Your cases here
 
-    case Call(e1, e2) => eval(env,e1) match {
-      case Function(p,x,body) => p match {
-        case None => eval(extend(env,x,eval(env,e2)),body)
-        case Some(s) => eval(extend(extend(env, x, eval(env,e2)), s, Function(Some(s), x, body)), body)
-      }
-      case _ => throw DynamicTypeError(e)
-    }
+
   }
     
 
@@ -260,71 +272,85 @@ object Lab3 extends JsyApplication with Lab3Like {
     }
   }
     
-  def step(e: Expr): Expr = {
-    e match {
-      /* Base Cases: Do Rules */
-      case Print(v1) if isValue(v1) => println(pretty(v1)); Undefined
-      
-        // ****** Your cases here
-      case Unary(Neg, v) if isValue(v) => N(-toNumber(v))
-      case Unary(Not, v) if isValue(v) => B(!toBoolean(v))
-      case Binary(Seq, v1, v2) if  isValue(v1) => v2
-      case Binary(Plus,v1,v2) if isValue(v1) && isValue(v2) => (v1,v2) match {
-        case (_,S(_)) => S(toStr(v1) + v2)
-        case (S(_),_) => S(v1 + toStr(v2))
-        case (_,_) => N(toNumber(v1) + toNumber(v2))
-      }
-      case Binary(Minus,v1, v2) if isValue(v1) && isValue(v2) => N(toNumber(v1)-toNumber(v2))
-      case Binary(Times,v1, v2) if isValue(v1) && isValue(v2) => N(toNumber(v1)*toNumber(v2))
-      case Binary(Div,v1, v2) if isValue(v1) && isValue(v2) => N(toNumber(v1)/toNumber(v2))
-      case Binary(Lt,v1,v2) if isValue(v1) && isValue(v2) =>(v1,v2) match {
-        case (S(s1),S(s2)) => B(s1 < s2)
-        case (_, _) => B(toNumber(v1) < toNumber(v2))
-      }
+  def step(e: Expr): Expr = e match {
+    /* Base Cases: Do Rules */
+    case Print(v1) if isValue(v1) => println(pretty(v1)); Undefined
 
-      case Binary(Le,v1,v2) if isValue(v1) && isValue(v2) => (v1,v2) match {
-        case (S(s1),S(s2)) => B(s1 <= s2)
-        case (_, _) => B(toNumber(v1) <= toNumber(v2))
-      }
-
-      case Binary(Gt,v1,v2) if isValue(v1) && isValue(v2) => (v1,v2) match {
-        case (S(s1),S(s2)) => B(s1 > s2)
-        case (_, _) => B(toNumber(v1) > toNumber(v2))
-      }
-
-      case Binary(Ge,v1,v2) if isValue(v1) && isValue(v2) =>(v1,v2) match {
-        case (S(s1),S(s2)) => B(s1 >= s2)
-        case (_, _) => B(toNumber(v1) >= toNumber(v2))
-      }
-      case Binary(Ne,v1,v2) if isValue(v1) && isValue(v2) => (v1,v2) match {
-        case (Function(_,_,_),_) => throw DynamicTypeError(e)
-        case (_,Function(_,_,_)) => throw DynamicTypeError(e)
-        case (_,_) => B(v1 != v2)
-
-      }
-      case Binary(Eq,v1,v2) if isValue(v1) && isValue(v2) => (v1,v2) match {
-        case (Function(_,_,_),_) => throw DynamicTypeError(e)
-        case (_,Function(_,_,_)) => throw DynamicTypeError(e)
-        case (_,_) => B(v1 == v2)
-      }
-      case If(v1, v2, v3) if isValue(v1) && B(toBoolean(v1)) == B(true) => v2
-      case If(v1, v2, v3) if isValue(v1) && B(toBoolean(v1)) == B(false) => v3
-      case ConstDecl(x, v1, e2) if isValue(v1) => substitute(e2,v1,x)
-      case Call(v1,v2) if isValue(v1) && isValue(v2) => v1 match {
-        case Function(None,x,body) => substitute(body,v2,x)
-        case Function(Some(s),x,body) => substitute(substitute(body,v1,s),v2,x)
-        case _ => throw DynamicTypeError(e)
-      }
-
-      /* Inductive Cases: Search Rules */
-      case Print(e1) => Print(step(e1))
-      
-        // ****** Your cases here
-
-      /* Cases that should never match. Your cases above should ensure this. */
-      case Var(_) => throw new AssertionError("Gremlins: internal error, not closed expression.")
-      case N(_) | B(_) | Undefined | S(_) | Function(_, _, _) => throw new AssertionError("Gremlins: internal error, step should not be called on values.");
+      // ****** Your cases here
+    case Unary(Neg, v) if isValue(v) => N(-toNumber(v))
+    case Unary(Not, v) if isValue(v) => B(!toBoolean(v))
+    case Binary(Seq, v1, v2) if  isValue(v1) => v2
+    case Binary(Plus,v1,v2) if isValue(v1) && isValue(v2) => (v1,v2) match {
+      case (_,S(_)) => S(toStr(v1) + v2)
+      case (S(_),_) => S(v1 + toStr(v2))
+      case (_,_) => N(toNumber(v1) + toNumber(v2))
     }
+    case Binary(Minus,v1, v2) if isValue(v1) && isValue(v2) => N(toNumber(v1)-toNumber(v2))
+    case Binary(Times,v1, v2) if isValue(v1) && isValue(v2) => N(toNumber(v1)*toNumber(v2))
+    case Binary(Div,v1, v2) if isValue(v1) && isValue(v2) => N(toNumber(v1)/toNumber(v2))
+    case Binary(Lt,v1,v2) if isValue(v1) && isValue(v2) =>(v1,v2) match {
+      case (S(s1),S(s2)) => B(s1 < s2)
+      case (_, _) => B(toNumber(v1) < toNumber(v2))
+    }
+
+    case Binary(Le,v1,v2) if isValue(v1) && isValue(v2) => (v1,v2) match {
+      case (S(s1),S(s2)) => B(s1 <= s2)
+      case (_, _) => B(toNumber(v1) <= toNumber(v2))
+    }
+
+    case Binary(Gt,v1,v2) if isValue(v1) && isValue(v2) => (v1,v2) match {
+      case (S(s1),S(s2)) => B(s1 > s2)
+      case (_, _) => B(toNumber(v1) > toNumber(v2))
+    }
+
+    case Binary(Ge,v1,v2) if isValue(v1) && isValue(v2) =>(v1,v2) match {
+      case (S(s1),S(s2)) => B(s1 >= s2)
+      case (_, _) => B(toNumber(v1) >= toNumber(v2))
+    }
+    case Binary(Ne,v1,v2) if isValue(v1) && isValue(v2) => (v1,v2) match {
+      case (Function(_,_,_),_) => throw DynamicTypeError(e)
+      case (_,Function(_,_,_)) => throw DynamicTypeError(e)
+      case (_,_) => B(v1 != v2)
+
+    }
+    case Binary(Eq,v1,v2) if isValue(v1) && isValue(v2) => (v1,v2) match {
+      case (Function(_,_,_),_) => throw DynamicTypeError(e)
+      case (_,Function(_,_,_)) => throw DynamicTypeError(e)
+      case (_,_) => B(v1 == v2)
+    }
+    case If(v1, v2, v3) if isValue(v1) && B(toBoolean(v1)) == B(true) => v2
+    case If(v1, v2, v3) if isValue(v1) && B(toBoolean(v1)) == B(false) => v3
+    case ConstDecl(x, v1, e2) if isValue(v1) => substitute(e2,v1,x)
+    case Call(v1,v2) if isValue(v1) && isValue(v2) => v1 match {
+      case Function(None,x,body) => substitute(body,v2,x)
+      case Function(Some(s),x,body) => substitute(substitute(body,v1,s),v2,x)
+      case _ => throw DynamicTypeError(e)
+    }
+
+    /* Inductive Cases: Search Rules */
+    case Print(e1) => Print(step(e1))
+
+      // ****** Your cases here
+    case Unary(uop,e1) if(!isValue(e1)) => Unary(uop,step(e1))
+
+    case Binary(bop,e1,e2) if(!isValue(e1)) => Binary(bop,step(e1),e2) //do i need the if isvalue case
+
+    case Binary(bop,e1,e2) if(isValue(e1)) => (bop,e1,e2) match {
+      case (Eq, Function(_, _, _), e2) => throw DynamicTypeError(e)
+      case (Eq, e1, Function(_, _, _)) => throw DynamicTypeError(e)
+      case (Ne, Function(_, _, _), e2) => throw DynamicTypeError(e)
+      case (Ne, e1, Function(_, _, _)) => throw DynamicTypeError(e)
+      case (_, e1, e2) => Binary(bop,e1, step(e2))
+    }
+
+    case If(e1,e2,e3) if(!isValue(e1)) => If(step(e1),e2,e3)
+    case ConstDecl(x,e1,e2) if(!isValue(e1)) => ConstDecl(x,step(e1),e2)
+    case Call(v1,e2) if(isValue(v1)) => Call(v1,step(e2))
+    case Call(e1,e2) => Call(step(e1),e2)
+
+    /* Cases that should never match. Your cases above should ensure this. */
+    case Var(_) => throw new AssertionError("Gremlins: internal error, not closed expression.")
+    case N(_) | B(_) | Undefined | S(_) | Function(_, _, _) => throw new AssertionError("Gremlins: internal error, step should not be called on values.");
   }
 
 
