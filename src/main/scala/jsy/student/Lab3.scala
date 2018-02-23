@@ -5,11 +5,11 @@ import jsy.util.JsyApplication
 
 object Lab3 extends JsyApplication with Lab3Like {
   import jsy.lab3.ast._
-  
+
   /*
-   * CSCI 3155: Lab 3 
+   * CSCI 3155: Lab 3
    * <Zijun Xu>
-   * 
+   *
    * Partner: <Your Partner's Name>
    * Collaborators: <>
    */
@@ -17,27 +17,27 @@ object Lab3 extends JsyApplication with Lab3Like {
   /*
    * Fill in the appropriate portions above by replacing things delimited
    * by '<'... '>'.
-   * 
+   *
    * Replace the '???' expression with your code in each function.
    *
    * Do not make other modifications to this template, such as
    * - adding "extends App" or "extends Application" to your Lab object,
    * - adding a "main" method, and
    * - leaving any failing asserts.
-   * 
+   *
    * Your lab will not be graded if it does not compile.
-   * 
+   *
    * This template compiles without error. Before you submit comment out any
    * code that does not compile or causes a failing assert. Simply put in a
    * '???' as needed to get something  that compiles without error. The '???'
    * is a Scala expression that throws the exception scala.NotImplementedError.
    */
-  
+
   /*
    * The implementations of these helper functions for conversions can come
    * Lab 2. The definitions for the new value type for Function are given.
    */
-  
+
   def toNumber(v: Expr): Double = {
     require(isValue(v))
     (v: @unchecked) match {
@@ -50,7 +50,7 @@ object Lab3 extends JsyApplication with Lab3Like {
       case _ => throw new UnsupportedOperationException
     }
   }
-  
+
   def toBoolean(v: Expr): Boolean = {
     require(isValue(v))
     (v: @unchecked) match {
@@ -64,7 +64,7 @@ object Lab3 extends JsyApplication with Lab3Like {
       case _ => throw new UnsupportedOperationException
     }
   }
-  
+
   def toStr(v: Expr): String = {
     require(isValue(v))
     (v: @unchecked) match {
@@ -114,14 +114,14 @@ object Lab3 extends JsyApplication with Lab3Like {
 
 
   /* Big-Step Interpreter with Dynamic Scoping */
-  
+
   /*
    * Start by copying your code from Lab 2 here.
    */
   def eval(env: Env, e: Expr): Expr = e match {
     /* Base Cases */
-    case N(_) | B(_) | S(_) | Undefined | Function(_, _, _) => e
     case Var(x) => lookup(env, x)
+    case N(_) | B(_) | S(_) | Undefined | Function(_, _, _) => e
     case Undefined => Undefined
     /* Inductive Cases */
     case Print(e1) => println(pretty(eval(env, e1))); Undefined
@@ -155,12 +155,18 @@ object Lab3 extends JsyApplication with Lab3Like {
       case Eq => {
         val v1 = eval(env, e1)
         val v2 = eval(env, e2)
-        B(toNumber(eval(env,v1)) == toNumber(eval(env,v2)))
+        (v1,v2) match {
+          case ((Function(_,_,_),_) | (_,Function(_,_,_))) => throw DynamicTypeError(e)
+          case _ =>  B(toNumber(eval(env,v1)) == toNumber(eval(env,v2)))
+        }
       }
       case Ne => {
         val v1 = eval(env, e1)
         val v2 = eval(env, e2)
-        B(toNumber(eval(env,v1)) != toNumber(eval(env,v2)))
+        (v1,v2) match {
+          case ((Function(_,_,_),_) | (_,Function(_,_,_))) => throw DynamicTypeError(e)
+          case _ => B(toNumber(eval(env,v1)) != toNumber(eval(env,v2)))
+        }
       }
       case Lt => {
         val v1 = eval(env, e1)
@@ -201,13 +207,13 @@ object Lab3 extends JsyApplication with Lab3Like {
       case And => {
         val v1 = eval(env, e1)
         val v2 = eval(env, e2)
-        if (toBoolean(eval(env,v1)) == false) eval(env,v1)
+        if (!toBoolean(eval(env, v1))) eval(env,v1)
         else eval(env,v2)
       }
       case Or => {
         val v1 = eval(env, e1)
         val v2 = eval(env, e2)
-        if (toBoolean(eval(env,v1)) == true) eval(env,v1)
+        if (toBoolean(eval(env, v1))) eval(env,v1)
         else eval(env,v2)
       }
       case Seq => {
@@ -244,7 +250,7 @@ object Lab3 extends JsyApplication with Lab3Like {
 
 
   }
-    
+
 
   /* Small-Step Interpreter with Static Scoping */
 
@@ -255,7 +261,7 @@ object Lab3 extends JsyApplication with Lab3Like {
     }
     loop(e0, 0)
   }
-  
+
   def substitute(e: Expr, v: Expr, x: String): Expr = {
     require(isValue(v))
     e match {
@@ -271,7 +277,7 @@ object Lab3 extends JsyApplication with Lab3Like {
       case ConstDecl(y, e1, e2) => if (y == x) ConstDecl(y,substitute(e1,v,x),e2) else ConstDecl(y,substitute(e1,v,x), substitute(e2,v,x))
     }
   }
-    
+
   def step(e: Expr): Expr = e match {
     /* Base Cases: Do Rules */
     case Print(v1) if isValue(v1) => println(pretty(v1)); Undefined
@@ -331,21 +337,25 @@ object Lab3 extends JsyApplication with Lab3Like {
     case Print(e1) => Print(step(e1))
 
       // ****** Your cases here
-    case Unary(uop,e1) if(!isValue(e1)) => Unary(uop,step(e1))
+    case Unary(uop,e1) if !isValue(e1) => Unary(uop,step(e1))
 
-    case Binary(bop,e1,e2) if(!isValue(e1)) => Binary(bop,step(e1),e2) //do i need the if isvalue case
+    case Binary(bop,e1,e2) if !isValue(e1) => Binary(bop,step(e1),e2) //do i need the if isvalue case
 
-    case Binary(bop,e1,e2) if(isValue(e1)) => (bop,e1,e2) match {
+    case Binary(bop,e1,e2) if isValue(e1) => (bop,e1,e2) match {
       case (Eq, Function(_, _, _), e2) => throw DynamicTypeError(e)
       case (Eq, e1, Function(_, _, _)) => throw DynamicTypeError(e)
       case (Ne, Function(_, _, _), e2) => throw DynamicTypeError(e)
       case (Ne, e1, Function(_, _, _)) => throw DynamicTypeError(e)
-      case (_, e1, e2) => Binary(bop,e1, step(e2))
+      case (_, _, _) => Binary(bop,e1, step(e2))
     }
 
-    case If(e1,e2,e3) if(!isValue(e1)) => If(step(e1),e2,e3)
-    case ConstDecl(x,e1,e2) if(!isValue(e1)) => ConstDecl(x,step(e1),e2)
-    case Call(v1,e2) if(isValue(v1)) => Call(v1,step(e2))
+    case If(e1,e2,e3) if !isValue(e1) => If(step(e1),e2,e3)
+    case ConstDecl(x,e1,e2) if !isValue(e1) => ConstDecl(x,step(e1),e2)
+    case Call(v1,e2) if (isValue(v1)) => v1 match {
+      case Function(_,_,_) => Call(v1,step(e2))
+      case _ => throw DynamicTypeError(e)
+    }
+
     case Call(e1,e2) => Call(step(e1),e2)
 
     /* Cases that should never match. Your cases above should ensure this. */
@@ -355,7 +365,7 @@ object Lab3 extends JsyApplication with Lab3Like {
 
 
   /* External Interfaces */
-  
+
   //this.debug = true // uncomment this if you want to print debugging information
   this.keepGoing = true // comment this out if you want to stop at first exception when processing a file
 
