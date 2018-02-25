@@ -120,7 +120,8 @@ object Lab3 extends JsyApplication with Lab3Like {
   def eval(env: Env, e: Expr): Expr = {
     e match {
       /* Base Cases */
-      case N(_) | B(_) | S(_) | Undefined | Function(_, _, _) => e
+      case _ if isValue(e) => e
+      //case N(_) | B(_) | S(_) | Undefined | Function(_, _, _) => e
       case Var(x) => lookup(env, x)
 
       /* Inductive Cases */
@@ -136,17 +137,10 @@ object Lab3 extends JsyApplication with Lab3Like {
 
       case Binary(bop, e1, e2) => {
         bop match {
-          case Plus => {
-            (bop, e1, e2) match {
-              // if either e1: S(s) or e2: S(s), should concatenate
-              case (_, S(_), _) | (_, _, S(_)) => {
-                S(toStr(eval(env, e1)) + toStr(eval(env, e2)))
-              }
-              // otherwise just add as numbers
-              case _ => {
-                N(toNumber(eval(env, e1)) + toNumber(eval(env, e2)))
-              }
-            }
+          case Plus => (eval(env,e1),eval(env,e2)) match {
+            case (S(s1),v2) => S(s1 + toStr(v2))
+            case (v1,S(s2)) => S(toStr(v1) + s2)
+            case (v1,v2) => N(toNumber(v1) + toNumber(v2))
           }
           // begin easy mode
           case Minus => { // much easier than Plus--no concatenation required.
@@ -314,11 +308,11 @@ object Lab3 extends JsyApplication with Lab3Like {
       case Unary(Neg, v) if isValue(v) => N(-toNumber(v))
       case Unary(Not, v) if isValue(v) => B(!toBoolean(v))
 
-      case Binary(Seq, v1, v2) if isValue(v1) => v2
+      case Binary(Seq, v1, e2) if isValue(v1) => e2
 
       case Binary(Plus, v1, v2) if isValue(v1) && isValue(v2) => (v1, v2) match {
-        case (_,S(_)) => S(toStr(v1) + v2)
-        case (S(_),_) => S(v1 + toStr(v2))
+        case (_,S(str2)) => S(toStr(v1) + str2)
+        case (S(str1),_) => S(str1 + toStr(v2))
         case (_,_) => N(toNumber(v1) + toNumber(v2))
       }
 
@@ -326,19 +320,19 @@ object Lab3 extends JsyApplication with Lab3Like {
       case Binary(Times, v1, v2) if isValue(v1) && isValue(v2) => N(toNumber(v1) * toNumber(v2))
       case Binary(Div, v1, v2) if isValue(v1) && isValue(v2) => N(toNumber(v1) / toNumber(v2))
 
-      case Binary(Lt, v1, v2) if (isValue(v1) && isValue(v2)) => {
+      case Binary(Lt, v1, v2) if isValue(v1) && isValue(v2) => {
         B(inequalityVal(Lt, v1, v2))
       }
 
-      case Binary(Le, v1, v2) if (isValue(v1) && isValue(v2)) => {
+      case Binary(Le, v1, v2) if isValue(v1) && isValue(v2) => {
         B(inequalityVal(Le, v1, v2))
       }
 
-      case Binary(Gt, v1, v2) if (isValue(v1) && isValue(v2)) => {
+      case Binary(Gt, v1, v2) if isValue(v1) && isValue(v2) => {
         B(inequalityVal(Gt, v1, v2))
       }
 
-      case Binary(Ge, v1, v2) if (isValue(v1) && isValue(v2)) => {
+      case Binary(Ge, v1, v2) if isValue(v1) && isValue(v2) => {
         B(inequalityVal(Ge, v1, v2))
       }
 
@@ -354,22 +348,12 @@ object Lab3 extends JsyApplication with Lab3Like {
         case (_, _) => B(v1 == v2)
       }
 
-      case Binary(And, v1, v2) if isValue(v1) && isValue(v2) => {
-        if (toBoolean(v1) == true) {
-          v2
-        } else if (toBoolean(v1) == false) {
-          v1
-        } else { // if (toBoolean(v2) == false) {
-          v2
-        }
+      case Binary(And, v1, e2) if isValue(v1) => {
+        if (toBoolean(v1)) e2 else v1
       }
 
-      case Binary(Or, v1, v2) if isValue(v1) && isValue(v2) => {
-        if (toBoolean(v1) == true) {
-          v1
-        } else {
-          v2
-        }
+      case Binary(Or, v1, e2) if isValue(v1) => {
+        if (toBoolean(v1)) v1 else e2
       }
 
       case If(v1, v2, v3) if isValue(v1) => {
@@ -407,12 +391,11 @@ object Lab3 extends JsyApplication with Lab3Like {
       case If(e1, e2, e3) if !isValue(e1) => If(step(e1), e2, e3)
       case ConstDecl(x, e1, e2) if !isValue(e1) => ConstDecl(x, step(e1), e2)
 
+      case Call(e1, e2) if !isValue(e1)=> Call(step(e1), e2)
       case Call(v1, e2) if (isValue(v1)) => v1 match {
         case Function(_, _, _) => Call(v1, step(e2))
         case _ => throw DynamicTypeError(e)
       }
-
-      case Call(e1, e2) => Call(step(e1), e2)
 
       /* Cases that should never match. Your cases above should ensure this. */
       case Var(_) => throw new AssertionError("Gremlins: internal error, not closed expression.")
