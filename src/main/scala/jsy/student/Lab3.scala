@@ -8,9 +8,9 @@ object Lab3 extends JsyApplication with Lab3Like {
 
   /*
   * CSCI 3155: Lab 3
-  * Lucas Schaack
+  * Zijun Xu
   *
-  * Partner: <Your Partner's Name>
+  * Partner: <Luke Schaack>
   * Collaborators: <Any Collaborators>
   */
 
@@ -121,7 +121,7 @@ object Lab3 extends JsyApplication with Lab3Like {
     e match {
       /* Base Cases */
       case _ if isValue(e) => e
-      //case N(_) | B(_) | S(_) | Undefined | Function(_, _, _) => e
+      case N(_) | B(_) | S(_) | Undefined | Function(_, _, _) => e
       case Var(x) => lookup(env, x)
 
       /* Inductive Cases */
@@ -169,7 +169,7 @@ object Lab3 extends JsyApplication with Lab3Like {
 
             (v1, v2) match {
               case ((Function(_, _, _),_) | (_, Function(_, _, _))) => throw DynamicTypeError(e)
-              case _ => B(v1 == v2)
+              case _ => B(v1 != v2)
             }
           }
 
